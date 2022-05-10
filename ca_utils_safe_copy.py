@@ -87,22 +87,8 @@ class moving_object:
             self.xy = Point(rel_x_start,rel_y_start)
         self.vertices = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
         self.counter = 0
+        
         pass
-
-    def update_direction_lines(self):
-        self.r_l = line_eq_from_points(self.vertices[0], self.vertices[3])
-        self.r_r = line_eq_from_points(self.vertices[1], self.vertices[2])
-        pass
-
-    def update_safety_rectangle(self):
-        vert = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
-        vert[0] = cartesian_rotation(Point(-safe_dst[self.type][1],safe_dst[self.type][0]),self.heading)
-        vert[1] = cartesian_rotation(Point(-safe_dst[self.type][1],-safe_dst[self.type][2]),self.heading)
-        vert[2] = cartesian_rotation(Point(safe_dst[self.type][3],-safe_dst[self.type][2]),self.heading)
-        vert[3] = cartesian_rotation(Point(safe_dst[self.type][3],safe_dst[self.type][0]),self.heading)
-        self.vertices = [Point(vert[i].x+self.xy.x,vert[i].y+self.xy.y) for i in range(4)]
-        pass
-
 
     def update_position(self,n_lat, n_lon):
         self.prev_lat = self.lat
@@ -130,6 +116,20 @@ class moving_object:
         self.heading = heading_between_two_points(self.xy, self.xy_prev)
         self.heading_deg = self.heading*180/math.pi
         self.counter +=1
+        pass
+
+    def update_direction_lines(self):
+        self.r_l = line_eq_from_points(self.vertices[0], self.vertices[3])
+        self.r_r = line_eq_from_points(self.vertices[1], self.vertices[2])
+        pass
+
+    def update_safety_rectangle(self):
+        vert = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
+        vert[0] = cartesian_rotation(Point(-safe_dst[self.type][1],safe_dst[self.type][0]),self.heading)
+        vert[1] = cartesian_rotation(Point(-safe_dst[self.type][1],-safe_dst[self.type][2]),self.heading)
+        vert[2] = cartesian_rotation(Point(safe_dst[self.type][3],-safe_dst[self.type][2]),self.heading)
+        vert[3] = cartesian_rotation(Point(safe_dst[self.type][3],safe_dst[self.type][0]),self.heading)
+        self.vertices = [Point(vert[i].x+self.xy.x,vert[i].y+self.xy.y) for i in range(4)]
         pass
 
     
@@ -180,7 +180,6 @@ def collision_state(obj_1: moving_object, obj_2: moving_object):
     collision_time = max(collision_time_table_1.min(),collision_time_table_2.min())
     if occupation_timedelta_1.is_intersection(occupation_timedelta_2) and collision == True:
         print("collision in %f seconds" % collision_time)
-        return [c_list, collision_time_table_1, collision_time_table_2,occupation_timedelta_1,occupation_timedelta_2]
-    else:
-        return [c_list]
+    
+    return [c_list, collision_time_table_1, collision_time_table_2,occupation_timedelta_1,occupation_timedelta_2]
     
