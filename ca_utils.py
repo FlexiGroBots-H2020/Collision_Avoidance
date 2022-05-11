@@ -1,6 +1,5 @@
 # ca_utils
 
-from turtle import update
 import numpy as np
 import math
 import time
@@ -75,16 +74,20 @@ def get_relative_coordinates(origin_coordinates, coordinates):
     return Point(x_rel, y_rel)
 
 class moving_object:
-    def __init__(self, lat, lon, id, type, rel_x_start = float("inf"),rel_y_start = float("inf")):
+    def __init__(self, lat, lon, id, type, rel_x_start = float("inf"),rel_y_start = float("inf"),external_timestamp = -1):
         self.lat = lat
         self.lon = lon
-        self.timestamp = time.time()
+        if external_timestamp == -1:
+            self.timestamp = time.time()
+        else:
+            self.timestamp = external_timestamp
         self.type = type
         self.id = id
         if rel_x_start == float("inf") or rel_y_start == float("inf"):
             self.xy = get_relative_coordinates(origin, (self.lat, self.lon))
         else:
             self.xy = Point(rel_x_start,rel_y_start)
+        self.heading = 0
         self.vertices = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
         self.counter = 0
         pass
@@ -104,13 +107,18 @@ class moving_object:
         pass
 
 
-    def update_position(self,n_lat, n_lon):
+    def update_position(self,n_lat, n_lon,external_timestamp = -1):
         self.prev_lat = self.lat
         self.lat = n_lat
         self.prev_lon = self.lon
         self.lon = n_lon
         self.prev_timestamp = self.timestamp
-        self.timestamp = time.time()     ## timestamps seconds
+
+        if external_timestamp == -1:
+            self.timestamp = time.time()
+        else:
+            self.timestamp = external_timestamp
+
         distance = haversine((self.lat, self.lon),(self.prev_lat,self.prev_lon), unit=Unit.METERS)
         self.speed = distance / ((self.timestamp - self.prev_timestamp))        ##speed in m/s
         self.xy_prev = self.xy
@@ -120,20 +128,22 @@ class moving_object:
         self.counter +=1
         pass
 
-    def update_position_local(self,t_x, t_y):
+    def update_position_local(self, t_x, t_y, external_timestamp = -1):
         self.xy_prev = self.xy
         self.xy = Point(t_x, t_y)
         self.prev_timestamp = self.timestamp
-        self.timestamp = time.time()     ## timestamps seconds
+
+        if external_timestamp == -1:
+            self.timestamp = time.time()
+        else:
+            self.timestamp = external_timestamp
+
         distance = self.xy.distance(self.xy_prev)
         self.speed = distance / ((self.timestamp - self.prev_timestamp))        ##speed in m/s
         self.heading = heading_between_two_points(self.xy, self.xy_prev)
         self.heading_deg = self.heading*180/math.pi
         self.counter +=1
         pass
-
-    
-
 
 ##  Collision Avoidance function
 
@@ -182,5 +192,56 @@ def collision_state(obj_1: moving_object, obj_2: moving_object):
         print("collision in %f seconds" % collision_time)
         return [c_list, collision_time_table_1, collision_time_table_2,occupation_timedelta_1,occupation_timedelta_2]
     else:
+        print("No collision")
         return [c_list]
     
+
+def collision_sat(obj_1: moving_object, obj_2: moving_object):
+    x1_0 = min([vertices.x for vertices in obj_1.vertices])
+    x1_1 = max([vertices.x for vertices in obj_1.vertices])
+    x2_0 = min([vertices.x for vertices in obj_2.vertices])
+    x2_1 = max([vertices.x for vertices in obj_2.vertices])
+
+    y1_0 = min([vertices.y for vertices in obj_1.vertices])
+    y1_1 = max([vertices.y for vertices in obj_1.vertices])
+    y2_0 = min([vertices.y for vertices in obj_2.vertices])
+    y2_1 = max([vertices.y for vertices in obj_2.vertices])
+
+    v1_x = round(obj_1.speed*math.sin(obj_1.heading),5)
+    v1_y = round(obj_1.speed*math.cos(obj_1.heading),5)
+
+    v2_x = round(obj_2.speed*math.sin(obj_2.heading),5)
+    v2_y = round(obj_2.speed*math.cos(obj_2.heading),5)
+    
+    print("speed components")
+    print(v1_x, v1_y)
+    print(v2_x, v2_y)
+
+    
+    if (v1_x - v2_x) != 0:
+        s0x = [((x2_0-x1_0)/(v1_x-v2_x)),((x2_1-x1_0)/(v1_x-v2_x))]
+        s1x = [((x1_0-x2_0)/(v2_x-v1_x)),((x1_1-x2_0)/(v2_x-v1_x))]
+        ci_x = [min(s0x+s1x),max(s0x+s1x)]
+    else:
+        ci_x = [-float("inf"),float("inf")]
+
+    if (v1_y - v2_y) != 0:
+        s0y = [((y2_0-y1_0)/(v1_y-v2_y)),((y2_1-y1_0)/(v1_y-v2_y))]
+        s1y = [((y1_0-y2_0)/(v2_y-v1_y)),((y1_1-y2_0)/(v2_y-v1_y))]
+        ci_y = [min(s0y+s1y),max(s0y+s1y)]
+    else:
+        ci_y = [-float("inf"),float("inf")]
+
+    print("crossing intervals")
+    print(ci_x)
+    print(ci_y)
+
+    if (min(ci_x[1], ci_y[1]) - max(ci_x[0], ci_y[0])) > 0:
+        time_to_collision = max(ci_x[0], ci_y[0])
+        time_end_collision = min(ci_x[1], ci_y[1])
+        
+        return [time_to_collision, time_end_collision]
+
+
+
+    return "Ao"
