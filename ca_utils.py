@@ -5,8 +5,9 @@ import math
 import time
 from geographiclib.geodesic import Geodesic
 from haversine import haversine, Unit
-from shapely.geometry import Point
+from shapely.geometry import Point,Polygon
 from datetimerange import DateTimeRange
+import matplotlib.pyplot as plt
 
 ##  Defines distances from object, according to heading direction, defining safe rectangle [meters]
 safe_dst = {"Tractor":[5,5,5,20], "Cow": [5,5,5,5]}
@@ -196,7 +197,7 @@ def collision_state(obj_1: moving_object, obj_2: moving_object):
         return [c_list]
     
 
-def collision_sat(obj_1: moving_object, obj_2: moving_object):
+def collision_sat(obj_1: moving_object, obj_2: moving_object, verbose = False):
     x1_0 = min([vertices.x for vertices in obj_1.vertices])
     x1_1 = max([vertices.x for vertices in obj_1.vertices])
     x2_0 = min([vertices.x for vertices in obj_2.vertices])
@@ -213,9 +214,10 @@ def collision_sat(obj_1: moving_object, obj_2: moving_object):
     v2_x = round(obj_2.speed*math.sin(obj_2.heading),5)
     v2_y = round(obj_2.speed*math.cos(obj_2.heading),5)
     
-    print("speed components")
-    print(v1_x, v1_y)
-    print(v2_x, v2_y)
+    if verbose:
+        print("speed components")
+        print(v1_x, v1_y)
+        print(v2_x, v2_y)
 
     
     if (v1_x - v2_x) != 0:
@@ -231,10 +233,10 @@ def collision_sat(obj_1: moving_object, obj_2: moving_object):
         ci_y = [min(s0y+s1y),max(s0y+s1y)]
     else:
         ci_y = [-float("inf"),float("inf")]
-
-    print("crossing intervals")
-    print(ci_x)
-    print(ci_y)
+    if verbose:
+        print("crossing intervals")
+        print(ci_x)
+        print(ci_y)
 
     if (min(ci_x[1], ci_y[1]) - max(ci_x[0], ci_y[0])) > 0:
         time_to_collision = max(ci_x[0], ci_y[0])
@@ -242,6 +244,45 @@ def collision_sat(obj_1: moving_object, obj_2: moving_object):
         
         return [time_to_collision, time_end_collision]
 
+    return [float("inf"),float("inf")]
 
+def plot_object_lines(object_1: moving_object, object_2: moving_object,ax,figure):
+    plt.axis('equal')
+    polygon1 = Polygon(object_1.vertices)
+    x1,y1 = polygon1.exterior.xy
 
-    return "Ao"
+    polygon2 = Polygon(object_2.vertices)
+    x2,y2 = polygon2.exterior.xy
+
+    if object_2.r_l.m == float('inf'):
+        ax.axvline(x = object_2.r_l.q, color="blue", linestyle="--")
+    else:
+        ax.axline((0,object_2.r_l.q),slope=object_2.r_l.m,color="blue", linestyle="--")
+
+    if object_2.r_r.m == float('inf'):
+        ax.axvline(x = object_2.r_r.q, color="blue", linestyle="--")
+    else:
+        ax.axline((0,object_2.r_r.q),slope=object_2.r_r.m,color="blue", linestyle="--")
+
+    if object_1.r_l.m == float('inf'):
+        ax.axvline(x = object_1.r_l.q, color="red", linestyle="--")
+    else:
+        ax.axline((0,object_1.r_l.q),slope=object_1.r_l.m,color="red", linestyle="--")
+
+    if object_1.r_r.m == float('inf'):
+        ax.axvline(x = object_1.r_r.q, color="red", linestyle="--")
+    else:
+        ax.axline((0,object_1.r_r.q),slope=object_1.r_r.m,color="red", linestyle="--")
+
+    ax.arrow(object_1.xy_prev.x,object_1.xy_prev.y,(object_1.xy.x-object_1.xy_prev.x),(object_1.xy.y-object_1.xy_prev.y),length_includes_head=True,head_width=2, head_length=2)
+    ax.arrow(object_2.xy_prev.x,object_2.xy_prev.y,(object_2.xy.x-object_2.xy_prev.x),(object_2.xy.y-object_2.xy_prev.y),length_includes_head=True,head_width=2, head_length=2)
+
+    plt.plot(x1,y1, c="red")
+    plt.plot(x2,y2,c="blue")
+    plt.xlim([-100, 100])
+    plt.ylim([-100, 100])
+    ax.set_autoscale_on(False)
+    figure.canvas.draw()
+    figure.canvas.flush_events()
+    plt.show()
+    plt.cla()
