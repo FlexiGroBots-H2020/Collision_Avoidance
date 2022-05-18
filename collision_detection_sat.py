@@ -1,7 +1,5 @@
 from ca_utils import *
-from shapely.geometry import Point, Polygon, MultiPoint
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 plt.style.use('default')
 import time
 
@@ -35,4 +33,4 @@ for i in range(steps):
     plt.text(-50,-50,str(moving_separating_axis_theorem(object_1, object_2)))
     plt.text(50,50,str(separating_axis_theorem(object_1, object_2)))
     plot_object_lines(object_1,object_2,ax,figure)
-    time.sleep(1/25)
+    time.sleep(1)
