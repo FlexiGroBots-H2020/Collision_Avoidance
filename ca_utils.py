@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 ##  Defines distances from object, according to heading direction, defining safe rectangle [meters]
 vehicle_priorities = {"Tractor": 10, "Spraying drone":8}
 safe_dst = {"Tractor":[5,5,5,10],"Spraying drone": [3,3,3,3] , "Cow": [2,2,2,2]}
-super_safe_distances = {"Tractor":[10,10,10,20],"Cow": [5,5,5,5]}
+super_safe_distances = {"Tractor":[10,10,10,20],"Cow": [5,5,5,5],"Spraying drone": [7,7,7,7]}
 origin = (65,14)
 
 vertical_line_threshold = 1/1000000
@@ -143,6 +143,9 @@ class moving_object:    # come se si potesse commentare in una riga
         self.heading = heading_between_two_points(self.xy, self.xy_prev)
         self.heading_deg = self.heading*180/math.pi
         self.counter +=1
+        self.update_super_safety_rectangle()
+        self.update_safety_rectangle()
+        self.update_direction_lines()
         pass
 
     def update_position_local(self, t_x, t_y, external_timestamp = -1):     # update positional parameters from local coordinates (for test & debug)
@@ -160,6 +163,9 @@ class moving_object:    # come se si potesse commentare in una riga
         self.heading = heading_between_two_points(self.xy, self.xy_prev)
         self.heading_deg = self.heading*180/math.pi
         self.counter +=1
+        self.update_super_safety_rectangle()
+        self.update_safety_rectangle()
+        self.update_direction_lines()
         pass
 
 def collision_sat_old(obj_1: moving_object, obj_2: moving_object, verbose = False):     # return: collision time interval [start of collision, end of collision] (using minimum circumscribed rectangle) 
@@ -253,8 +259,8 @@ def plot_object_lines(object_1: moving_object, object_2: moving_object,ax,figure
     plt.plot(x_ss_1,y_ss_1,'--',c = "red")
     plt.plot(x_ss_2,y_ss_2,'--',c = "blue")
     
-    plt.xlim([-50, 100])
-    plt.ylim([-50, 100])
+    plt.xlim([-100, 100])
+    plt.ylim([-100, 100])
     ax.set_autoscale_on(False)
     figure.canvas.draw()
     figure.canvas.flush_events()

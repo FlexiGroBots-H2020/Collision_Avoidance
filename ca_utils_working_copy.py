@@ -9,7 +9,8 @@ from shapely.geometry import Point,Polygon
 import matplotlib.pyplot as plt
 
 ##  Defines distances from object, according to heading direction, defining safe rectangle [meters]
-safe_dst = {"Tractor":[3,3,3,7], "Cow": [3,3,3,3]}
+vehicle_priorities = {"Tractor": 10, "Spraying drone":8}
+safe_dst = {"Tractor":[5,5,5,10],"Spraying drone": [3,3,3,3] , "Cow": [2,2,2,2]}
 super_safe_distances = {"Tractor":[10,10,10,20],"Cow": [5,5,5,5]}
 origin = (65,14)
 
@@ -215,8 +216,14 @@ def plot_object_lines(object_1: moving_object, object_2: moving_object,ax,figure
     polygon1 = Polygon(object_1.vertices)
     x1,y1 = polygon1.exterior.xy
 
+    polygon_ss_1 = Polygon(object_1.super_safe_vertices)
+    x_ss_1, y_ss_1 = polygon_ss_1.exterior.xy
+
     polygon2 = Polygon(object_2.vertices)
     x2,y2 = polygon2.exterior.xy
+
+    polygon_ss_2 = Polygon(object_2.super_safe_vertices)
+    x_ss_2, y_ss_2 = polygon_ss_2.exterior.xy
 
     if object_2.r_l.m == float('inf'):
         ax.axvline(x = object_2.r_l.q, color="blue", linestyle="--")
@@ -243,8 +250,11 @@ def plot_object_lines(object_1: moving_object, object_2: moving_object,ax,figure
 
     plt.plot(x1,y1, c="red")
     plt.plot(x2,y2,c="blue")
-    plt.xlim([-100, 100])
-    plt.ylim([-100, 100])
+    plt.plot(x_ss_1,y_ss_1,'--',c = "red")
+    plt.plot(x_ss_2,y_ss_2,'--',c = "blue")
+    
+    plt.xlim([-50, 100])
+    plt.ylim([-50, 100])
     ax.set_autoscale_on(False)
     figure.canvas.draw()
     figure.canvas.flush_events()
@@ -333,9 +343,9 @@ def separating_axis_theorem(obj_a: moving_object, obj_b: moving_object,super_saf
         projection_a = project(vertices_a, axis)
         projection_b = project(vertices_b, axis)
 
-        oi = interval_intersection(projection_a, projection_b)
-        
-        if oi == [float("nan"), float("nan")] :
+        oi = interval_intersection([projection_a, projection_b])
+
+        if math.isnan(oi[0]) and math.isnan(oi[1]):
             return False
 
     return True

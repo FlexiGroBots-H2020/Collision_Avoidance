@@ -1,30 +1,17 @@
-import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib.animation as animation
-import matplotlib.patches as patches
-
-fig = plt.figure()
-ax = fig.add_subplot(111)
-ax.set_xlim(-10,10)
-ax.set_ylim(-10,10)
-
-v= np.array([
-    [0., -0.25],  
-    [0.5, 0.],  
-    [0., 0.25]
-    ])
-
-patch = patches.Polygon(v,closed=True, fc='r', ec='r')
-ax.add_patch(patch)
-
-def init():
-    return patch,
-
-def animate(i):
-    v[:,0]+=i
-    patch.set_xy(v)
-    return patch,
-
-ani = animation.FuncAnimation(fig, animate, np.arange(1, 5), init_func=init,
-                              interval=1000, blit=True)
+import matplotlib.pyplot as plt
+import time
+point = plt.plot(0, 0, "g^")[0]
+plt.ylim(0, 5)
+plt.xlim(0, 5)
+plt.ion()
 plt.show()
+
+start_time = time.time()
+t = 0
+while t < 4:
+    end_time = time.time()
+    t = end_time - start_time
+    print(t)
+    point.set_data(t, t)
+    plt.pause(1/50)
