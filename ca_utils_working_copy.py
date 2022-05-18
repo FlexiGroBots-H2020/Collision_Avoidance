@@ -6,12 +6,11 @@ import time
 from geographiclib.geodesic import Geodesic
 from haversine import haversine, Unit
 from shapely.geometry import Point,Polygon
-from datetimerange import DateTimeRange
 import matplotlib.pyplot as plt
 
 ##  Defines distances from object, according to heading direction, defining safe rectangle [meters]
-safe_dst = {"Tractor":[5,5,5,20], "Cow": [5,5,5,5]}
-
+safe_dst = {"Tractor":[3,3,3,7], "Cow": [3,3,3,3]}
+super_safe_distances = {"Tractor":[10,10,10,20],"Cow": [5,5,5,5]}
 origin = (65,14)
 
 vertical_line_threshold = 1/1000000
@@ -31,6 +30,13 @@ class line:     ## line(m,q) object with equation y = mx + q, if line is vertica
         self.q = q
     def __str__(self):
         return "Line with equation y = %fx + %f" % (self.m, self.q)
+
+class vector:       # vector from (x0, y0) to (x,y), default (x0, y0) = (0, 0)
+    def __init__(self, x, y, x0 = 0, y0 = 0):
+        self.x = x
+        self.y = y
+        self.x0 = x0
+        self.y0 = y0
 
 def intersection_between_lines (l1: line, l2: line):    # return: intersection point between two lines
     if l1.m != float('inf') and l2.m != float('inf'):
@@ -90,6 +96,7 @@ class moving_object:    # come se si potesse commentare in una riga
             self.xy = Point(rel_x_start,rel_y_start)
         self.heading = 0
         self.vertices = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
+        self.super_safe_vertices = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
         self.counter = 0
         pass
 
@@ -105,6 +112,15 @@ class moving_object:    # come se si potesse commentare in una riga
         vert[2] = cartesian_rotation(Point(safe_dst[self.type][3],-safe_dst[self.type][2]),self.heading)
         vert[3] = cartesian_rotation(Point(safe_dst[self.type][3],safe_dst[self.type][0]),self.heading)
         self.vertices = [Point(vert[i].x+self.xy.x,vert[i].y+self.xy.y) for i in range(4)]
+        pass
+
+    def update_super_safety_rectangle(self):  # update coordinates of safety rectangle according to position and heading
+        vert = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
+        vert[0] = cartesian_rotation(Point(-super_safe_distances[self.type][1],super_safe_distances[self.type][0]),self.heading)
+        vert[1] = cartesian_rotation(Point(-super_safe_distances[self.type][1],-super_safe_distances[self.type][2]),self.heading)
+        vert[2] = cartesian_rotation(Point(super_safe_distances[self.type][3],-super_safe_distances[self.type][2]),self.heading)
+        vert[3] = cartesian_rotation(Point(super_safe_distances[self.type][3],super_safe_distances[self.type][0]),self.heading)
+        self.super_safe_vertices = [Point(vert[i].x+self.xy.x,vert[i].y+self.xy.y) for i in range(4)]
         pass
 
     def update_position(self,n_lat, n_lon,external_timestamp = -1):     # update positional parameters from GPS coordinates
@@ -235,19 +251,19 @@ def plot_object_lines(object_1: moving_object, object_2: moving_object,ax,figure
     plt.show()
     plt.cla()
 
-def normalize(vector):      # return: The vector scaled to a length of 1
-    norm = math.sqrt(vector[0] ** 2 + vector[1] ** 2)
-    return vector[0] / norm, vector[1] / norm
+def normalize(v: vector):      # return: The vector scaled to a length of 1
+    norm = math.sqrt(v.x ** 2 + v.y ** 2)
+    return vector(v.x / norm, v.y / norm)
 
-def dot(vector1: Point, vector2: Point):  # return: The dot (or scalar) product of the two vectors (vectors represended as (0,0)-> Point(x,y))
-    d = vector1.x * vector2.x + vector1.y * vector2.y
+def dot(v1: vector, v2: vector):  # return: The dot (or scalar) product of the two vectors (vectors represended as (0,0)-> Point(x,y))
+    d = v1.x * v2.x + v1.y * v2.y
     return d
 
 def edge_direction(point0: Point, point1: Point):   # return: A vector going from point0 to point1
-    return point1.x - point0.x, point1.y - point0.y
+    return vector(point1.x - point0.x, point1.y - point0.y)
 
-def orthogonal(vector):     # return: A new vector which is orthogonal to the given vector
-    return vector[1], -vector[0]
+def orthogonal(vo: vector):     # return: A new vector which is orthogonal to the given vector
+    return vector(vo.y, -vo.x)
 
 def vertices_to_edges(vertices):    # return: A list of the edges of the vertices as vectors
     return [edge_direction(vertices[i], vertices[(i + 1) % len(vertices)])for i in range(len(vertices))]
@@ -262,7 +278,7 @@ def interval_intersection(intervals: list):     # return: Intersection between c
         if (min(intervals[i][1],p[1]) - max(intervals[i][0],p[0])) > 0:
             p = [max(intervals[i][0],p[0]),min(intervals[i][1],p[1])]
         else:
-            return [-float("inf"),float("inf")]
+            return [float("nan"),float("nan")]
     return p
     
 def local_overlapping_interval(p1:list, p2: list, pv1: float, pv2:float):       # return: Intersection time interval for two moving intervals p1 = [p1_0 + t*v1, p1_1 + t*v1] and [p2_0 + t*v2, p2_1 + t*v2]
@@ -279,9 +295,10 @@ def moving_separating_axis_theorem(obj_a: moving_object, obj_b: moving_object): 
 
     va_x = round(obj_a.speed*math.sin(obj_a.heading),5)
     va_y = round(obj_a.speed*math.cos(obj_a.heading),5)
-
+    va = vector(va_x,va_y)
     vb_x = round(obj_b.speed*math.sin(obj_b.heading),5)
     vb_y = round(obj_b.speed*math.cos(obj_b.heading),5)
+    vb = vector(vb_x,vb_y)
 
     edges = vertices_to_edges(vertices_a) + vertices_to_edges(vertices_b)
     axes = [normalize(orthogonal(edge)) for edge in edges]
@@ -291,11 +308,34 @@ def moving_separating_axis_theorem(obj_a: moving_object, obj_b: moving_object): 
     for axis in axes:
         projection_a = project(vertices_a, axis)
         projection_b = project(vertices_b, axis)
-        speed_projection_a = dot([va_x,va_y],axis)
-        speed_projection_b = dot([vb_x,vb_y],axis)
+        speed_projection_a = dot(va,axis)
+        speed_projection_b = dot(vb,axis)
         loi = local_overlapping_interval(projection_a,projection_b,speed_projection_a,speed_projection_b)
         overlapping_intervals.append(loi)
 
     collision_interval = interval_intersection(overlapping_intervals)
 
     return collision_interval
+
+def separating_axis_theorem(obj_a: moving_object, obj_b: moving_object,super_safe = True):        # return: True if objects are colliding
+    if super_safe:
+        vertices_a = obj_a.super_safe_vertices
+        vertices_b = obj_b.super_safe_vertices
+    else:
+        vertices_a = obj_a.vertices
+        vertices_b = obj_b.vertices
+        
+    
+    edges = vertices_to_edges(vertices_a) + vertices_to_edges(vertices_b)
+    axes = [normalize(orthogonal(edge)) for edge in edges]
+
+    for axis in axes:
+        projection_a = project(vertices_a, axis)
+        projection_b = project(vertices_b, axis)
+
+        oi = interval_intersection(projection_a, projection_b)
+        
+        if oi == [float("nan"), float("nan")] :
+            return False
+
+    return True

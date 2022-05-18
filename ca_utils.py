@@ -6,17 +6,17 @@ import time
 from geographiclib.geodesic import Geodesic
 from haversine import haversine, Unit
 from shapely.geometry import Point,Polygon
-from datetimerange import DateTimeRange
 import matplotlib.pyplot as plt
 
 ##  Defines distances from object, according to heading direction, defining safe rectangle [meters]
-safe_dst = {"Tractor":[5,5,5,20], "Cow": [5,5,5,5]}
-
+vehicle_priorities = {"Tractor": 10, "Spraying drone":8}
+safe_dst = {"Tractor":[5,5,5,10],"Spraying drone": [3,3,3,3] , "Cow": [2,2,2,2]}
+super_safe_distances = {"Tractor":[10,10,10,20],"Cow": [5,5,5,5]}
 origin = (65,14)
 
 vertical_line_threshold = 1/1000000
 
-def line_eq_from_points (p1: Point, p2: Point):       ## returns tuple (m,q) for equation y = mx +q, if line is vertical returns (inf, x0) for equation x = x0
+def line_eq_from_points (p1: Point, p2: Point):       # return: line object line(m,q) for equation y = mx +q, if line is vertical returns (inf, x0) for equation x = x0
     if abs(p1.x-p2.x) > vertical_line_threshold:    ## check if line is not vertical
         m = (p1.y-p2.y)/(p1.x-p2.x)
         q = (p1.x*p2.y-p2.x*p1.y)/(p1.x-p2.x)
@@ -25,14 +25,21 @@ def line_eq_from_points (p1: Point, p2: Point):       ## returns tuple (m,q) for
         q = p1.x
     return line(m,q)
 
-class line:     ## line object with equation y = mx + q
+class line:     ## line(m,q) object with equation y = mx + q, if line is vertical: line(inf, x0) for equation x = x0
     def __init__(self,m,q):
         self.m = m
         self.q = q
     def __str__(self):
         return "Line with equation y = %fx + %f" % (self.m, self.q)
 
-def intersection_between_lines (l1: line, l2: line):
+class vector:       # vector from (x0, y0) to (x,y), default (x0, y0) = (0, 0)
+    def __init__(self, x, y, x0 = 0, y0 = 0):
+        self.x = x
+        self.y = y
+        self.x0 = x0
+        self.y0 = y0
+
+def intersection_between_lines (l1: line, l2: line):    # return: intersection point between two lines
     if l1.m != float('inf') and l2.m != float('inf'):
         a = np.array([[-l1.m,1],[-l2.m,1]])
         b = np.array([l1.q,l2.q])
@@ -45,12 +52,12 @@ def intersection_between_lines (l1: line, l2: line):
     else:
         return Point(float('inf'),float('inf'))
 
-def cartesian_rotation(p: Point,angle):
+def cartesian_rotation(p: Point,angle):     # return: input point rotated around (0,0), angle positive CW from vertical
     a = math.pi/2 -angle
     x_rotated, y_rotated = (p.x*math.cos(a)-p.y*math.sin(a),p.y*math.cos(a)+p.x*math.sin(a))
     return Point(x_rotated, y_rotated)
 
-def heading_between_two_points(p1: Point, p2: Point):  ## p1 Current Point, p2 Previous Point
+def heading_between_two_points(p1: Point, p2: Point):   # return: heading of vector from p1 to p2, angle positive CW from vertical
     dx = p1.x -p2.x
     dy = p1.y -p2.y
     if (dy) != 0:
@@ -67,14 +74,14 @@ def heading_between_two_points(p1: Point, p2: Point):  ## p1 Current Point, p2 P
         h = -math.pi/2
     return h
 
-def get_relative_coordinates(origin_coordinates, coordinates):
+def get_relative_coordinates(origin_coordinates, coordinates):      # return: local coordinates Point(x,y) from GPS coordinates and local origin reference point
     d = haversine(origin_coordinates,(coordinates), unit=Unit.METERS)
     b = Geodesic.WGS84.Inverse(origin_coordinates[0],origin_coordinates[1],coordinates[0],coordinates[0])['azi1']
     x_rel = d*math.sin(b)
     y_rel = d*math.cos(b)
     return Point(x_rel, y_rel)
 
-class moving_object:
+class moving_object:    # come se si potesse commentare in una riga
     def __init__(self, lat, lon, id, type, rel_x_start = float("inf"),rel_y_start = float("inf"),external_timestamp = -1):
         self.lat = lat
         self.lon = lon
@@ -90,15 +97,16 @@ class moving_object:
             self.xy = Point(rel_x_start,rel_y_start)
         self.heading = 0
         self.vertices = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
+        self.super_safe_vertices = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
         self.counter = 0
         pass
 
-    def update_direction_lines(self):
+    def update_direction_lines(self):   # update direction lines equation (only for rectangles (for now))
         self.r_l = line_eq_from_points(self.vertices[0], self.vertices[3])
         self.r_r = line_eq_from_points(self.vertices[1], self.vertices[2])
         pass
 
-    def update_safety_rectangle(self):
+    def update_safety_rectangle(self):  # update coordinates of safety rectangle according to position and heading
         vert = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
         vert[0] = cartesian_rotation(Point(-safe_dst[self.type][1],safe_dst[self.type][0]),self.heading)
         vert[1] = cartesian_rotation(Point(-safe_dst[self.type][1],-safe_dst[self.type][2]),self.heading)
@@ -107,8 +115,16 @@ class moving_object:
         self.vertices = [Point(vert[i].x+self.xy.x,vert[i].y+self.xy.y) for i in range(4)]
         pass
 
+    def update_super_safety_rectangle(self):  # update coordinates of safety rectangle according to position and heading
+        vert = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
+        vert[0] = cartesian_rotation(Point(-super_safe_distances[self.type][1],super_safe_distances[self.type][0]),self.heading)
+        vert[1] = cartesian_rotation(Point(-super_safe_distances[self.type][1],-super_safe_distances[self.type][2]),self.heading)
+        vert[2] = cartesian_rotation(Point(super_safe_distances[self.type][3],-super_safe_distances[self.type][2]),self.heading)
+        vert[3] = cartesian_rotation(Point(super_safe_distances[self.type][3],super_safe_distances[self.type][0]),self.heading)
+        self.super_safe_vertices = [Point(vert[i].x+self.xy.x,vert[i].y+self.xy.y) for i in range(4)]
+        pass
 
-    def update_position(self,n_lat, n_lon,external_timestamp = -1):
+    def update_position(self,n_lat, n_lon,external_timestamp = -1):     # update positional parameters from GPS coordinates
         self.prev_lat = self.lat
         self.lat = n_lat
         self.prev_lon = self.lon
@@ -129,7 +145,7 @@ class moving_object:
         self.counter +=1
         pass
 
-    def update_position_local(self, t_x, t_y, external_timestamp = -1):
+    def update_position_local(self, t_x, t_y, external_timestamp = -1):     # update positional parameters from local coordinates (for test & debug)
         self.xy_prev = self.xy
         self.xy = Point(t_x, t_y)
         self.prev_timestamp = self.timestamp
@@ -146,9 +162,7 @@ class moving_object:
         self.counter +=1
         pass
 
-##  Collision Avoidance function
-
-def collision_sat_old(obj_1: moving_object, obj_2: moving_object, verbose = False):
+def collision_sat_old(obj_1: moving_object, obj_2: moving_object, verbose = False):     # return: collision time interval [start of collision, end of collision] (using minimum circumscribed rectangle) 
     x1_0 = min([vertices.x for vertices in obj_1.vertices])
     x1_1 = max([vertices.x for vertices in obj_1.vertices])
     x2_0 = min([vertices.x for vertices in obj_2.vertices])
@@ -197,13 +211,19 @@ def collision_sat_old(obj_1: moving_object, obj_2: moving_object, verbose = Fals
 
     return [float("inf"),float("inf")]
 
-def plot_object_lines(object_1: moving_object, object_2: moving_object,ax,figure):
+def plot_object_lines(object_1: moving_object, object_2: moving_object,ax,figure):      # garbage just for demonstation
     plt.axis('equal')
     polygon1 = Polygon(object_1.vertices)
     x1,y1 = polygon1.exterior.xy
 
+    polygon_ss_1 = Polygon(object_1.super_safe_vertices)
+    x_ss_1, y_ss_1 = polygon_ss_1.exterior.xy
+
     polygon2 = Polygon(object_2.vertices)
     x2,y2 = polygon2.exterior.xy
+
+    polygon_ss_2 = Polygon(object_2.super_safe_vertices)
+    x_ss_2, y_ss_2 = polygon_ss_2.exterior.xy
 
     if object_2.r_l.m == float('inf'):
         ax.axvline(x = object_2.r_l.q, color="blue", linestyle="--")
@@ -230,10 +250,102 @@ def plot_object_lines(object_1: moving_object, object_2: moving_object,ax,figure
 
     plt.plot(x1,y1, c="red")
     plt.plot(x2,y2,c="blue")
-    plt.xlim([-100, 100])
-    plt.ylim([-100, 100])
+    plt.plot(x_ss_1,y_ss_1,'--',c = "red")
+    plt.plot(x_ss_2,y_ss_2,'--',c = "blue")
+    
+    plt.xlim([-50, 100])
+    plt.ylim([-50, 100])
     ax.set_autoscale_on(False)
     figure.canvas.draw()
     figure.canvas.flush_events()
     plt.show()
     plt.cla()
+
+def normalize(v: vector):      # return: The vector scaled to a length of 1
+    norm = math.sqrt(v.x ** 2 + v.y ** 2)
+    return vector(v.x / norm, v.y / norm)
+
+def dot(v1: vector, v2: vector):  # return: The dot (or scalar) product of the two vectors (vectors represended as (0,0)-> Point(x,y))
+    d = v1.x * v2.x + v1.y * v2.y
+    return d
+
+def edge_direction(point0: Point, point1: Point):   # return: A vector going from point0 to point1
+    return vector(point1.x - point0.x, point1.y - point0.y)
+
+def orthogonal(vo: vector):     # return: A new vector which is orthogonal to the given vector
+    return vector(vo.y, -vo.x)
+
+def vertices_to_edges(vertices):    # return: A list of the edges of the vertices as vectors
+    return [edge_direction(vertices[i], vertices[(i + 1) % len(vertices)])for i in range(len(vertices))]
+
+def project(vertices, axis):    # return: A vector showing how much of the vertices lies along the axis
+    dots = [dot(vertex, axis) for vertex in vertices]
+    return [min(dots), max(dots)]
+
+def interval_intersection(intervals: list):     # return: Intersection between closed & bounded intervals
+    p = [-float("inf"),float("inf")]
+    for i in range(len(intervals)):
+        if (min(intervals[i][1],p[1]) - max(intervals[i][0],p[0])) > 0:
+            p = [max(intervals[i][0],p[0]),min(intervals[i][1],p[1])]
+        else:
+            return [float("nan"),float("nan")]
+    return p
+    
+def local_overlapping_interval(p1:list, p2: list, pv1: float, pv2:float):       # return: Intersection time interval for two moving intervals p1 = [p1_0 + t*v1, p1_1 + t*v1] and [p2_0 + t*v2, p2_1 + t*v2]
+    if (pv1 - pv2) != 0:
+        s0x = [((p2[0]-p1[0])/(pv1-pv2)),((p2[1]-p1[0])/(pv1-pv2))]
+        s1x = [((p1[0]-p2[0])/(pv2-pv1)),((p1[1]-p2[0])/(pv2-pv1))]
+        return [min(s0x+s1x),max(s0x+s1x)]
+    else:
+        return [-float("inf"),float("inf")]
+
+def moving_separating_axis_theorem(obj_a: moving_object, obj_b: moving_object):        # return: Collision time interval [start of collision, end of collision]
+    vertices_a = obj_a.vertices
+    vertices_b = obj_b.vertices
+
+    va_x = round(obj_a.speed*math.sin(obj_a.heading),5)
+    va_y = round(obj_a.speed*math.cos(obj_a.heading),5)
+    va = vector(va_x,va_y)
+    vb_x = round(obj_b.speed*math.sin(obj_b.heading),5)
+    vb_y = round(obj_b.speed*math.cos(obj_b.heading),5)
+    vb = vector(vb_x,vb_y)
+
+    edges = vertices_to_edges(vertices_a) + vertices_to_edges(vertices_b)
+    axes = [normalize(orthogonal(edge)) for edge in edges]
+
+    overlapping_intervals = []
+
+    for axis in axes:
+        projection_a = project(vertices_a, axis)
+        projection_b = project(vertices_b, axis)
+        speed_projection_a = dot(va,axis)
+        speed_projection_b = dot(vb,axis)
+        loi = local_overlapping_interval(projection_a,projection_b,speed_projection_a,speed_projection_b)
+        overlapping_intervals.append(loi)
+
+    collision_interval = interval_intersection(overlapping_intervals)
+
+    return collision_interval
+
+def separating_axis_theorem(obj_a: moving_object, obj_b: moving_object,super_safe = True):        # return: True if objects are colliding
+    if super_safe:
+        vertices_a = obj_a.super_safe_vertices
+        vertices_b = obj_b.super_safe_vertices
+    else:
+        vertices_a = obj_a.vertices
+        vertices_b = obj_b.vertices
+        
+    
+    edges = vertices_to_edges(vertices_a) + vertices_to_edges(vertices_b)
+    axes = [normalize(orthogonal(edge)) for edge in edges]
+
+    for axis in axes:
+        projection_a = project(vertices_a, axis)
+        projection_b = project(vertices_b, axis)
+
+        oi = interval_intersection([projection_a, projection_b])
+
+        if math.isnan(oi[0]) and math.isnan(oi[1]):
+            return False
+
+    return True
