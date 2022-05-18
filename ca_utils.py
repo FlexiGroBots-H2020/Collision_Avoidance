@@ -3,16 +3,16 @@
 import numpy as np
 import math
 import time
-from geographiclib.geodesic import Geodesic
-from haversine import haversine, Unit
 from shapely.geometry import Point,Polygon
 import matplotlib.pyplot as plt
+import pymap3d as pm
+
 
 ##  Defines distances from object, according to heading direction, defining safe rectangle [meters]
 vehicle_priorities = {"Tractor": 10, "Spraying drone":8}
 safe_dst = {"Tractor":[5,5,5,10],"Spraying drone": [3,3,3,3] , "Cow": [2,2,2,2]}
 super_safe_distances = {"Tractor":[10,10,10,20],"Cow": [5,5,5,5],"Spraying drone": [7,7,7,7]}
-origin = (65,14)
+origin = (65.0566799,25.4587279)
 
 vertical_line_threshold = 1/1000000
 
@@ -75,10 +75,9 @@ def heading_between_two_points(p1: Point, p2: Point):   # return: heading of vec
     return h
 
 def get_relative_coordinates(origin_coordinates, coordinates):      # return: local coordinates Point(x,y) from GPS coordinates and local origin reference point
-    d = haversine(origin_coordinates,(coordinates), unit=Unit.METERS)
-    b = Geodesic.WGS84.Inverse(origin_coordinates[0],origin_coordinates[1],coordinates[0],coordinates[0])['azi1']
-    x_rel = d*math.sin(b)
-    y_rel = d*math.cos(b)
+    ned = pm.geodetic2ned(coordinates[0],coordinates[1],0,origin_coordinates[0],origin_coordinates[1],0)
+    y_rel = ned[0]
+    x_rel = ned[1]
     return Point(x_rel, y_rel)
 
 class moving_object:    # come se si potesse commentare in una riga
@@ -99,6 +98,7 @@ class moving_object:    # come se si potesse commentare in una riga
         self.vertices = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
         self.super_safe_vertices = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
         self.counter = 0
+        self.speed = 0
         pass
 
     def update_direction_lines(self):   # update direction lines equation (only for rectangles (for now))
@@ -136,10 +136,10 @@ class moving_object:    # come se si potesse commentare in una riga
         else:
             self.timestamp = external_timestamp
 
-        distance = haversine((self.lat, self.lon),(self.prev_lat,self.prev_lon), unit=Unit.METERS)
-        self.speed = distance / ((self.timestamp - self.prev_timestamp))        ##speed in m/s
         self.xy_prev = self.xy
         self.xy = get_relative_coordinates(origin, (self.lat, self.lon))
+        distance = self.xy.distance(self.xy_prev)
+        self.speed = distance / ((self.timestamp - self.prev_timestamp))
         self.heading = heading_between_two_points(self.xy, self.xy_prev)
         self.heading_deg = self.heading*180/math.pi
         self.counter +=1
@@ -259,8 +259,8 @@ def plot_object_lines(object_1: moving_object, object_2: moving_object,ax,figure
     plt.plot(x_ss_1,y_ss_1,'--',c = "red")
     plt.plot(x_ss_2,y_ss_2,'--',c = "blue")
     
-    plt.xlim([-100, 100])
-    plt.ylim([-100, 100])
+    plt.xlim([-100, 400])
+    plt.ylim([-100, 400])
     ax.set_autoscale_on(False)
     figure.canvas.draw()
     figure.canvas.flush_events()
