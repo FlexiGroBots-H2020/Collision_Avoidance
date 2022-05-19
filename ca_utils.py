@@ -10,11 +10,12 @@ import pymap3d as pm
 
 ##  Defines distances from object, according to heading direction, defining safe rectangle [meters]
 vehicle_priorities = {"Tractor": 10, "Spraying drone":8}
-safe_dst = {"Tractor":[5,5,5,10],"Spraying drone": [3,3,3,3] , "Cow": [2,2,2,2]}
-super_safe_distances = {"Tractor":[10,10,10,20],"Cow": [5,5,5,5],"Spraying drone": [7,7,7,7]}
+safe_dst = {"Tractor":[2.5,2.5,2.5,4],"Spraying drone": [1,1,1,1] , "Cow": [2,2,2,2]}
+super_safe_distances = {"Tractor":[5,5,5,10],"Cow": [5,5,5,5],"Spraying drone": [3,3,3,3]}
 origin = (65.0566799,25.4587279)
 
 vertical_line_threshold = 1/1000000
+
 
 def line_eq_from_points (p1: Point, p2: Point):       # return: line object line(m,q) for equation y = mx +q, if line is vertical returns (inf, x0) for equation x = x0
     if abs(p1.x-p2.x) > vertical_line_threshold:    ## check if line is not vertical
@@ -94,6 +95,7 @@ class moving_object:    # come se si potesse commentare in una riga
             self.xy = get_relative_coordinates(origin, (self.lat, self.lon))
         else:
             self.xy = Point(rel_x_start,rel_y_start)
+        self.xy_prev = self.xy
         self.heading = 0
         self.vertices = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
         self.super_safe_vertices = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
@@ -124,7 +126,7 @@ class moving_object:    # come se si potesse commentare in una riga
         self.super_safe_vertices = [Point(vert[i].x+self.xy.x,vert[i].y+self.xy.y) for i in range(4)]
         pass
 
-    def update_position(self,n_lat, n_lon,external_timestamp = -1):     # update positional parameters from GPS coordinates
+    def update_position(self,n_lat, n_lon,external_heading,external_timestamp = -1):     # update positional parameters from GPS coordinates
         self.prev_lat = self.lat
         self.lat = n_lat
         self.prev_lon = self.lon
@@ -140,7 +142,10 @@ class moving_object:    # come se si potesse commentare in una riga
         self.xy = get_relative_coordinates(origin, (self.lat, self.lon))
         distance = self.xy.distance(self.xy_prev)
         self.speed = distance / ((self.timestamp - self.prev_timestamp))
-        self.heading = heading_between_two_points(self.xy, self.xy_prev)
+        if self.speed < 0.1:
+            self.heading = external_heading*math.pi/180 if external_heading < 180 else (external_heading-360)*math.pi/180
+        else:
+            self.heading = heading_between_two_points(self.xy, self.xy_prev)
         self.heading_deg = self.heading*180/math.pi
         self.counter +=1
         self.update_super_safety_rectangle()
@@ -217,59 +222,39 @@ def collision_sat_old(obj_1: moving_object, obj_2: moving_object, verbose = Fals
 
     return [float("inf"),float("inf")]
 
-def plot_object_lines(object_1: moving_object, object_2: moving_object,ax,figure):      # garbage just for demonstation
-    plt.axis('equal')
-    polygon1 = Polygon(object_1.vertices)
-    x1,y1 = polygon1.exterior.xy
+def plot_object_lines(object_1: moving_object, object_2: moving_object,r1,r1_ss, r2, r2_ss,p1,p2):      # garbage just for demonstation
+     # if object_2.r_l.m == float('inf'):
+    #     ax.axvline(x = object_2.r_l.q, color="blue", linestyle="--")
+    # else:
+    #     ax.axline((0,object_2.r_l.q),slope=object_2.r_l.m,color="blue", linestyle="--")
 
-    polygon_ss_1 = Polygon(object_1.super_safe_vertices)
-    x_ss_1, y_ss_1 = polygon_ss_1.exterior.xy
+    # if object_2.r_r.m == float('inf'):
+    #     ax.axvline(x = object_2.r_r.q, color="blue", linestyle="--")
+    # else:
+    #     ax.axline((0,object_2.r_r.q),slope=object_2.r_r.m,color="blue", linestyle="--")
 
-    polygon2 = Polygon(object_2.vertices)
-    x2,y2 = polygon2.exterior.xy
+    # if object_1.r_l.m == float('inf'):
+    #     ax.axvline(x = object_1.r_l.q, color="red", linestyle="--")
+    # else:
+    #     ax.axline((0,object_1.r_l.q),slope=object_1.r_l.m,color="red", linestyle="--")
 
-    polygon_ss_2 = Polygon(object_2.super_safe_vertices)
-    x_ss_2, y_ss_2 = polygon_ss_2.exterior.xy
+    # if object_1.r_r.m == float('inf'):
+    #     ax.axvline(x = object_1.r_r.q, color="red", linestyle="--")
+    # else:
+    #     ax.axline((0,object_1.r_r.q),slope=object_1.r_r.m,color="red", linestyle="--")
 
-    if object_2.r_l.m == float('inf'):
-        ax.axvline(x = object_2.r_l.q, color="blue", linestyle="--")
-    else:
-        ax.axline((0,object_2.r_l.q),slope=object_2.r_l.m,color="blue", linestyle="--")
+    r1.set_data(Polygon(object_1.vertices).exterior.xy)
+    r1_ss.set_data(Polygon(object_1.super_safe_vertices).exterior.xy)
+    r2.set_data(Polygon(object_2.vertices).exterior.xy)
+    r2_ss.set_data(Polygon(object_2.super_safe_vertices).exterior.xy)
 
-    if object_2.r_r.m == float('inf'):
-        ax.axvline(x = object_2.r_r.q, color="blue", linestyle="--")
-    else:
-        ax.axline((0,object_2.r_r.q),slope=object_2.r_r.m,color="blue", linestyle="--")
-
-    if object_1.r_l.m == float('inf'):
-        ax.axvline(x = object_1.r_l.q, color="red", linestyle="--")
-    else:
-        ax.axline((0,object_1.r_l.q),slope=object_1.r_l.m,color="red", linestyle="--")
-
-    if object_1.r_r.m == float('inf'):
-        ax.axvline(x = object_1.r_r.q, color="red", linestyle="--")
-    else:
-        ax.axline((0,object_1.r_r.q),slope=object_1.r_r.m,color="red", linestyle="--")
-
-    ax.arrow(object_1.xy_prev.x,object_1.xy_prev.y,(object_1.xy.x-object_1.xy_prev.x),(object_1.xy.y-object_1.xy_prev.y),length_includes_head=True,head_width=2, head_length=2)
-    ax.arrow(object_2.xy_prev.x,object_2.xy_prev.y,(object_2.xy.x-object_2.xy_prev.x),(object_2.xy.y-object_2.xy_prev.y),length_includes_head=True,head_width=2, head_length=2)
-
-    plt.plot(x1,y1, c="red")
-    plt.plot(x2,y2,c="blue")
-    plt.plot(x_ss_1,y_ss_1,'--',c = "red")
-    plt.plot(x_ss_2,y_ss_2,'--',c = "blue")
-    
-    plt.xlim([-100, 400])
-    plt.ylim([-100, 400])
-    ax.set_autoscale_on(False)
-    figure.canvas.draw()
-    figure.canvas.flush_events()
-    plt.show()
-    plt.cla()
+    p1.set_data(object_1.xy.x,object_1.xy.y)
+    p2.set_data(object_2.xy.x,object_2.xy.y)
+   
 
 def normalize(v: vector):      # return: The vector scaled to a length of 1
     norm = math.sqrt(v.x ** 2 + v.y ** 2)
-    return vector(v.x / norm, v.y / norm)
+    return vector(v.x / norm, v.y / norm) if norm != 0 else vector(1,0)
 
 def dot(v1: vector, v2: vector):  # return: The dot (or scalar) product of the two vectors (vectors represended as (0,0)-> Point(x,y))
     d = v1.x * v2.x + v1.y * v2.y
