@@ -101,6 +101,7 @@ class moving_object:    # come se si potesse commentare in una riga
         self.super_safe_vertices = [Point(0,0),Point(0,0),Point(0,0),Point(0,0)]
         self.counter = 0
         self.speed = 0
+        self.active = True
         pass
 
     def update_direction_lines(self):   # update direction lines equation (only for rectangles (for now))
@@ -173,55 +174,6 @@ class moving_object:    # come se si potesse commentare in una riga
         self.update_direction_lines()
         pass
 
-def collision_sat_old(obj_1: moving_object, obj_2: moving_object, verbose = False):     # return: collision time interval [start of collision, end of collision] (using minimum circumscribed rectangle) 
-    x1_0 = min([vertices.x for vertices in obj_1.vertices])
-    x1_1 = max([vertices.x for vertices in obj_1.vertices])
-    x2_0 = min([vertices.x for vertices in obj_2.vertices])
-    x2_1 = max([vertices.x for vertices in obj_2.vertices])
-
-    y1_0 = min([vertices.y for vertices in obj_1.vertices])
-    y1_1 = max([vertices.y for vertices in obj_1.vertices])
-    y2_0 = min([vertices.y for vertices in obj_2.vertices])
-    y2_1 = max([vertices.y for vertices in obj_2.vertices])
-
-    v1_x = round(obj_1.speed*math.sin(obj_1.heading),5)
-    v1_y = round(obj_1.speed*math.cos(obj_1.heading),5)
-
-    v2_x = round(obj_2.speed*math.sin(obj_2.heading),5)
-    v2_y = round(obj_2.speed*math.cos(obj_2.heading),5)
-    
-    if verbose:
-        print("speed components")
-        print(v1_x, v1_y)
-        print(v2_x, v2_y)
-
-    
-    if (v1_x - v2_x) != 0:
-        s0x = [((x2_0-x1_0)/(v1_x-v2_x)),((x2_1-x1_0)/(v1_x-v2_x))]
-        s1x = [((x1_0-x2_0)/(v2_x-v1_x)),((x1_1-x2_0)/(v2_x-v1_x))]
-        ci_x = [min(s0x+s1x),max(s0x+s1x)]
-    else:
-        ci_x = [-float("inf"),float("inf")]
-
-    if (v1_y - v2_y) != 0:
-        s0y = [((y2_0-y1_0)/(v1_y-v2_y)),((y2_1-y1_0)/(v1_y-v2_y))]
-        s1y = [((y1_0-y2_0)/(v2_y-v1_y)),((y1_1-y2_0)/(v2_y-v1_y))]
-        ci_y = [min(s0y+s1y),max(s0y+s1y)]
-    else:
-        ci_y = [-float("inf"),float("inf")]
-    if verbose:
-        print("crossing intervals")
-        print(ci_x)
-        print(ci_y)
-
-    if (min(ci_x[1], ci_y[1]) - max(ci_x[0], ci_y[0])) > 0:
-        time_to_collision = max(ci_x[0], ci_y[0])
-        time_end_collision = min(ci_x[1], ci_y[1])
-        
-        return [time_to_collision, time_end_collision]
-
-    return [float("inf"),float("inf")]
-
 def plot_object_lines(object_1: moving_object, object_2: moving_object,r1,r1_ss, r2, r2_ss,p1,p2):      # garbage just for demonstation
      # if object_2.r_l.m == float('inf'):
     #     ax.axvline(x = object_2.r_l.q, color="blue", linestyle="--")
@@ -251,7 +203,6 @@ def plot_object_lines(object_1: moving_object, object_2: moving_object,r1,r1_ss,
     p1.set_data(object_1.xy.x,object_1.xy.y)
     p2.set_data(object_2.xy.x,object_2.xy.y)
    
-
 def normalize(v: vector):      # return: The vector scaled to a length of 1
     norm = math.sqrt(v.x ** 2 + v.y ** 2)
     return vector(v.x / norm, v.y / norm) if norm != 0 else vector(1,0)
@@ -325,7 +276,6 @@ def separating_axis_theorem(obj_a: moving_object, obj_b: moving_object,super_saf
     else:
         vertices_a = obj_a.vertices
         vertices_b = obj_b.vertices
-        
     
     edges = vertices_to_edges(vertices_a) + vertices_to_edges(vertices_b)
     axes = [normalize(orthogonal(edge)) for edge in edges]

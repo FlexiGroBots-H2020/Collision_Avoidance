@@ -1,9 +1,7 @@
 import matplotlib.pyplot as plt
 from ca_utils import *
 import paho.mqtt.client as mqttClient
-import time
-plt.style.use('default')
-from shapely.geometry import Polygon
+import csv
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
@@ -17,6 +15,11 @@ def on_message(client, userdata, message):
     list = message.payload.decode("utf-8").split("|")
     lat, lon = float(list[1]), float(list[3])
     h = float(list[7])
+
+    with open ("log.csv", "a+") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow([message.topic]+message.payload.decode("utf-8").split("|"))
+
     if message.topic == "/54321/1/attrs":
         object_1.update_position(lat, lon,h)
     else:
@@ -45,7 +48,6 @@ r1 = plt.plot(zero_polygon,c = "red")[0]
 r2 = plt.plot(zero_polygon,c = "blue")[0]
 r1_ss = plt.plot(zero_polygon,"--",c = "red")[0]
 r2_ss = plt.plot(zero_polygon,"--", c = "blue")[0]
-
 
 Connected = False   #global variable for the state of the MQTT connection
 client = mqttClient.Client("CA")

@@ -1,23 +1,18 @@
-from turtle import color
 from ca_utils import *
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 plt.style.use('default')
-import time
-import concurrent.futures
-from shapely.geometry import Point,Polygon
-from matplotlib.patches import Rectangle, Arrow
+from shapely.geometry import Polygon
 
 steps = 100
 steps_per_round = 50
 radius = 50
 m = 1
 
-obj1_pos_series_x = [radius*math.sin(t*2*math.pi/steps_per_round) for t in range(steps)]
-obj1_pos_series_y = [radius*math.cos(t*2*math.pi/steps_per_round) for t in range(steps)]
+#obj1_pos_series_x = [radius*math.sin(t*2*math.pi/steps_per_round) for t in range(steps)]
+#obj1_pos_series_y = [radius*math.cos(t*2*math.pi/steps_per_round) for t in range(steps)]
 
-#obj1_pos_series_x = [m*t for t in range(steps)]
-#obj1_pos_series_y = [50-m*t for t in range(steps)]
+obj1_pos_series_x = [m*t for t in range(steps)]
+obj1_pos_series_y = [50-m*t for t in range(steps)]
 
 obj2_pos_series_x = [-50+t for t in range(steps)]
 obj2_pos_series_y = [-50+m*t for t in range(steps)]
@@ -48,10 +43,3 @@ for i in range(steps):
     # plt.text(50,50,str(separating_axis_theorem(object_1, object_2)))
     plot_object_lines(object_1,object_2,r1, r1_ss,r2, r2_ss,p1,p2)
     plt.pause(0.5)
-
-
-#ani = animation.FuncAnimation(figure, plot_object_lines, fargs=(object_1, object_2,ax),interval =100)
-print("arrivo")
-
-
-#print("arrivo")
