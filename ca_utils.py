@@ -12,7 +12,7 @@ safe_dst = {"Tractor":[2.5,2.5,2.5,4],"Spraying drone": [1,1,1,1] , "Cow": [2,2,
 super_safe_distances = {"Tractor":[5,5,5,10],"Cow": [5,5,5,5],"Spraying drone": [3,3,3,3]}
 origin = (65.0566799,25.4587279)
 
-vertical_line_threshold = 1/1000000
+vertical_line_threshold = 1/1000000     ##line with angular coefficent > 1000000 are considered as vertical
 
 def line_eq_from_points (p1: Point, p2: Point):       # return: line object line(m,q) for equation y = mx +q, if line is vertical returns (inf, x0) for equation x = x0
     if abs(p1.x-p2.x) > vertical_line_threshold:    ## check if line is not vertical
