@@ -7,15 +7,12 @@ from shapely.geometry import Point,Polygon
 import matplotlib.pyplot as plt
 import pymap3d as pm
 
-
 ##  Defines distances from object, according to heading direction, defining safe rectangle [meters]
-vehicle_priorities = {"Tractor": 10, "Spraying drone":8}
 safe_dst = {"Tractor":[2.5,2.5,2.5,4],"Spraying drone": [1,1,1,1] , "Cow": [2,2,2,2]}
 super_safe_distances = {"Tractor":[5,5,5,10],"Cow": [5,5,5,5],"Spraying drone": [3,3,3,3]}
 origin = (65.0566799,25.4587279)
 
 vertical_line_threshold = 1/1000000
-
 
 def line_eq_from_points (p1: Point, p2: Point):       # return: line object line(m,q) for equation y = mx +q, if line is vertical returns (inf, x0) for equation x = x0
     if abs(p1.x-p2.x) > vertical_line_threshold:    ## check if line is not vertical
@@ -33,12 +30,41 @@ class line:     ## line(m,q) object with equation y = mx + q, if line is vertica
     def __str__(self):
         return "Line with equation y = %fx + %f" % (self.m, self.q)
 
+def heading_between_two_points(p1: Point, p2: Point):   # return: heading of vector from p1 to p2, angle positive CW from vertical
+    dx = p1.x -p2.x
+    dy = p1.y -p2.y
+    if (dy) != 0:
+        at = math.atan(dx/dy)
+        if dy > 0:
+            h = at
+        elif dx > 0:
+            h = at + math.pi
+        else:
+            h = at - math.pi
+    elif dx > 0:
+        h = math.pi/2
+    else:
+        h = -math.pi/2
+    return h
+
 class vector:       # vector from (x0, y0) to (x,y), default (x0, y0) = (0, 0)
     def __init__(self, x, y, x0 = 0, y0 = 0):
         self.x = x
         self.y = y
         self.x0 = x0
         self.y0 = y0
+    def __str__(self):
+        return "Vector from (%f,%f) to (%f,%f)" % (self.x0, self.y0, self.x, self.y)
+    def normalize(self):    #return: Normalized Vector (scaled to a length of 1)
+        norm = math.sqrt((self.x - self.x0) ** 2 + (self.y - self.y0) ** 2)
+        return vector((self.x - self.x0) / norm, (self.y - self.y0) / norm) if norm != 0 else vector(1,0)
+    def from_points(self,point0: Point, point1: Point):   # return: A vector going from point0 to point1
+        self.x = point1.x
+        self.x0 = point0.x
+        self.y = point1.y
+        self.y0 = point0.y
+    def heading(self):
+        return heading_between_two_points(Point(self.x, self.y), Point(self.x0, self.y0))
 
 def intersection_between_lines (l1: line, l2: line):    # return: intersection point between two lines
     if l1.m != float('inf') and l2.m != float('inf'):
@@ -58,31 +84,16 @@ def cartesian_rotation(p: Point,angle):     # return: input point rotated around
     x_rotated, y_rotated = (p.x*math.cos(a)-p.y*math.sin(a),p.y*math.cos(a)+p.x*math.sin(a))
     return Point(x_rotated, y_rotated)
 
-def heading_between_two_points(p1: Point, p2: Point):   # return: heading of vector from p1 to p2, angle positive CW from vertical
-    dx = p1.x -p2.x
-    dy = p1.y -p2.y
-    if (dy) != 0:
-        at = math.atan(dx/dy)
-        if dy > 0:
-            h = at
-        elif dx > 0:
-            h = at + math.pi
-        else:
-            h = at - math.pi
-    elif dx > 0:
-        h = math.pi/2
-    else:
-        h = -math.pi/2
-    return h
-
 def get_relative_coordinates(origin_coordinates, coordinates):      # return: local coordinates Point(x,y) from GPS coordinates and local origin reference point
     ned = pm.geodetic2ned(coordinates[0],coordinates[1],0,origin_coordinates[0],origin_coordinates[1],0)
     y_rel = ned[0]
     x_rel = ned[1]
     return Point(x_rel, y_rel)
 
-class moving_object:    # come se si potesse commentare in una riga
-    def __init__(self, lat, lon, id, type, rel_x_start = float("inf"),rel_y_start = float("inf"),external_timestamp = -1):
+class moving_object:    # Main class for collision prevision / detection between moving objects
+    def __init__(self, lat, lon, id, type, rel_x_start = float("inf"),rel_y_start = float("inf"),external_timestamp = -1):  # Initialization
+        # Initialization of moving object. If rel_x_start and rel_y_start are passed as arguments, lat and lon are ignored for the local positioning. 
+        # External timestamp can be used to have better accuracy in terms of speed 
         self.lat = lat
         self.lon = lon
         if external_timestamp == -1:
