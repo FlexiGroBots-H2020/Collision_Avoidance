@@ -90,7 +90,7 @@ def get_relative_coordinates(origin_coordinates, coordinates):      # return: lo
     x_rel = ned[1]
     return Point(x_rel, y_rel)
 
-class moving_object:    # Main class for collision prevision / detection between moving objects
+class moving_object:    # Class for geometric / algebraic definiton of moving objects in the 2d plane
     def __init__(self, lat, lon, id, type, rel_x_start = float("inf"),rel_y_start = float("inf"),external_timestamp = -1):  # Initialization
         # Initialization of moving object. If rel_x_start and rel_y_start are passed as arguments, lat and lon are ignored for the local positioning. 
         # External timestamp can be used to have better accuracy in terms of speed 

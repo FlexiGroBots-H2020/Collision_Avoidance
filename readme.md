@@ -1,5 +1,5 @@
 # **Collision detection and Avoidance tools**
-![](collision_resized.png)
+![Collision state](images/collision_resized.png)
 ## __Info__
 ca_utils is a python library meant for collision prediction, detection and (maybe) avoidance between both static and moving convex polygons
 
@@ -16,7 +16,7 @@ GPS coordinates received as Lat, Lon in WGS84 are translated into local cartesia
 
 ## Safety polygons
 Methods update_safety_rectangle and update_super_safe_rectangle of class moving_object are definig a rectangle oriented according to vehicle heading.  
-![Safety Polygons](rectangles_resized.png)
+![Safety Polygons](images/rectangles_resized.png)
 - Safe Polygon  
 Polygon representing the area occupied by the vehicle/object. Used for collision time computation
 - Super Safe Polygon  
@@ -24,7 +24,7 @@ Used for collision detection only, representative of the safe area around the ve
 ## Static SAT
 Implementation of the separating axis theorem for 2D convex polygons  
 More at https://en.wikipedia.org/wiki/Hyperplane_separation_theorem
-![Separating axis theorem](SAT_resized.png)
+![Separating axis theorem](images/SAT_resized.png)
 ## Moving SAT
 Separating axis theorem implementation based on the moving intervals time occupation of projection over axis. 
 The result is the interval __start of collision - end of collision__
@@ -40,4 +40,5 @@ Objects name, safe & super-safe polygon relative coordinates and mission pause p
 Setting will be moved to obj_types.json
 ## Plotting
 Plot functions working with matplotlib pyplot for real time visualization of fleet, safe areas and collision state.  
-To be refined
+Plot objects must be pre-defined before passing them as argument. 
+If the plot function is used, the time wait should be implemented via plt.pause()
